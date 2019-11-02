@@ -553,8 +553,8 @@ void menu (int wWidth, int wHeight, HDC * drawField, COLORREF * color, Tool * to
 
     HDC buttonsField = txCreateCompatibleDC (wWidth, wHeight);
 
-    Button b1 = {wWidth / 2 - 50, wHeight / 2 - 100, 100, 40,   "Save", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-    Button b2 = {wWidth / 2 - 50, wHeight / 2 -  60, 100, 40,   "Load", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
+    Button b1 = {wWidth / 2 - 50, wHeight / 2 - 100, 100, 40,   "Save", "Comic Sans MS", 35, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
+    Button b2 = {wWidth / 2 - 50, wHeight / 2 -  60, 100, 40,   "Load", "Comic Sans MS", 35, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
     Button b3 = {wWidth / 2 - 50, wHeight / 2 -  20, 100, 40,  "Color", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
     Button b4 = {wWidth / 2 - 50, wHeight / 2 +  20, 100, 40, "Import", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
     Button b5 = {wWidth / 2 - 50, wHeight / 2 +  60, 100, 40,  "Tools", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
@@ -649,17 +649,11 @@ void menu (int wWidth, int wHeight, HDC * drawField, COLORREF * color, Tool * to
 
                 txSleep (100);
 
-                int result = toolsMenu (wWidth, wHeight, drawField, tool);
+                toolsMenu (wWidth, wHeight, drawField, tool);
 
-                if (result != ResultExit)
+                txSleep (100);
 
-                {
-
-                    txSleep (100);
-
-                    return;
-
-                }
+                return;
 
                 break;
 
@@ -821,7 +815,7 @@ int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool)
 
                 txDeleteDC (buttonsField);
 
-                return -1;
+                return;
 
                 break;
 
@@ -835,7 +829,7 @@ int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool)
 
                 txDeleteDC (buttonsField);
 
-                return -1;
+                return;
 
                 break;
 
@@ -849,25 +843,9 @@ int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool)
 
                 txDeleteDC (buttonsField);
 
-                return -1;
+                return;
 
                 break;
-
-            }
-
-            default:
-
-            {
-
-                if (GetAsyncKeyState (VK_ESCAPE))
-
-                {
-
-                    txSleep (100);
-
-                    return ResultExit;
-
-                }
 
             }
 
