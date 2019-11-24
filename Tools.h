@@ -2,149 +2,21 @@
 
 //-----------------------------------------------------------------------------
 
-enum Tools
+void useDefault (COLORREF color, int r, HDC dc);
 
-{
+void drawDefault (COLORREF color, int r);
 
-    ToolDefault,
-    ToolLine,
-    ToolRectangle
+void useLine (COLORREF color, int r, HDC dc);
 
-};
+void drawLine (COLORREF color, int r);
 
-//-----------------------------------------------------------------------------
+void useRectangle (COLORREF color, int r, HDC dc);
 
-struct Tool
-
-{
-
-    int type_;
-    int r_;
-    COLORREF color_;
-    HDC dc_;
-
-    char * text_;
-    char * font_;
-
-    void draw ();
-    void use ();
-
-};
+void drawRectangle (COLORREF color, int r);
 
 //-----------------------------------------------------------------------------
 
-void drawDefault (int r, COLORREF color);
-
-void useDefault (int r, COLORREF color, HDC dc);
-
-void drawLine (int r, COLORREF color);
-
-void useLine (int r, COLORREF color, HDC dc);
-
-void drawRectangle (COLORREF color);
-
-void useRectangle (COLORREF color, HDC dc);
-
-//-----------------------------------------------------------------------------
-
-void Tool::draw ()
-
-{
-
-    switch (type_)
-
-    {
-
-        case ToolDefault:
-
-        {
-
-            drawDefault (r_, color_);
-            break;
-
-        }
-
-        case ToolLine:
-
-        {
-
-            drawLine (r_, color_);
-            break;
-
-        }
-
-        case ToolRectangle:
-
-        {
-
-            drawRectangle (color_);
-            break;
-
-        }
-
-    }
-
-}
-
-//-----------------------------------------------------------------------------
-
-void Tool::use ()
-
-{
-
-    switch (type_)
-
-    {
-
-        case ToolDefault:
-
-        {
-
-            useDefault (r_, color_, dc_);
-            break;
-
-        }
-
-        case ToolLine:
-
-        {
-
-            useLine (r_, color_, dc_);
-            break;
-
-        }
-
-        case ToolRectangle:
-
-        {
-
-            useRectangle (color_, dc_);
-            break;
-
-        }
-
-    }
-
-}
-
-//-----------------------------------------------------------------------------
-
-void drawDefault (int r, COLORREF color)
-
-{
-
-    POINT mPos = txMousePos ();
-
-    txSetColor (color);
-    txSetFillColor (color);
-
-    txEllipse (mPos.x - r / 2, mPos.y - r / 2, mPos.x + r / 2, mPos.y + r / 2);
-
-}
-
-//-----------------------------------------------------------------------------
-
-void useDefault (int r, COLORREF color, HDC dc)
+void useDefault (COLORREF color, int r, HDC dc)
 
 {
 
@@ -187,7 +59,7 @@ void useDefault (int r, COLORREF color, HDC dc)
 
 //-----------------------------------------------------------------------------
 
-void drawLine (int r, COLORREF color)
+void drawDefault (COLORREF color, int r)
 
 {
 
@@ -202,7 +74,7 @@ void drawLine (int r, COLORREF color)
 
 //-----------------------------------------------------------------------------
 
-void useLine (int r, COLORREF color, HDC dc)
+void useLine (COLORREF color, int r, HDC dc)
 
 {
 
@@ -235,9 +107,7 @@ void useLine (int r, COLORREF color, HDC dc)
 
 }
 
-//-----------------------------------------------------------------------------
-
-void drawRectangle (COLORREF color)
+void drawLine (COLORREF color, int r)
 
 {
 
@@ -246,13 +116,13 @@ void drawRectangle (COLORREF color)
     txSetColor (color);
     txSetFillColor (color);
 
-    txRectangle (mPos.x - 2, mPos.y - 2, mPos.x + 2, mPos.y + 2);
+    txEllipse (mPos.x - r / 2, mPos.y - r / 2, mPos.x + r / 2, mPos.y + r / 2);
 
 }
 
 //-----------------------------------------------------------------------------
 
-void useRectangle (COLORREF color, HDC dc)
+void useRectangle (COLORREF color, int r, HDC dc)
 
 {
 
@@ -282,5 +152,18 @@ void useRectangle (COLORREF color, HDC dc)
     txSetFillColor (color, dc);
 
     txRectangle (firstPos.x, firstPos.y, mPos.x, mPos.y, dc);
+
+}
+
+void drawRectangle (COLORREF color, int r)
+
+{
+
+    POINT mPos = txMousePos ();
+
+    txSetColor (color);
+    txSetFillColor (color);
+
+    txRectangle (mPos.x - 2, mPos.y - 2, mPos.x + 2, mPos.y + 2);
 
 }

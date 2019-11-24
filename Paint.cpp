@@ -1,6 +1,12 @@
 #include <TXLib.h>
-#include "Buttons.h"
+#include "Menu.h"
 #include "Tools.h"
+#include "Buttons.h"
+
+//-----------------------------------------------------------------------------
+
+const int WindWidth = 800;
+const int WindHeight = 800;
 
 //-----------------------------------------------------------------------------
 
@@ -15,36 +21,38 @@ enum Result
 
 //-----------------------------------------------------------------------------
 
-struct rectangle
+struct Painter
 
 {
 
-    int x;
-    int y;
-    int x1;
-    int y1;
+     void (*draw) (COLORREF color, int r);
+     void (*use) (COLORREF color, int r, HDC dc);
+
+     int r;
+
+     COLORREF color;
+
+     HDC drawField;
 
 };
 
 //-----------------------------------------------------------------------------
 
-int run (int wWidth, int wHeight, int r, COLORREF color);
+int run (int WindWidth, int WindHeight);
 
-bool Save (HDC image);
+void (*use) (COLORREF color, int r, HDC dc);
 
-void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, Tool tool);
+void (*draw) (COLORREF color, int r);
 
-void menu (int wWidth, int wHeight, HDC * drawField, COLORREF * color, Tool * tool);
+void menu (Painter * painter);
 
-void drawColorBar (int x, int y, int width, int height, HDC * dc);
+void chooseTool (Painter * painter);
 
-void drawSubColorBar (int x, int y, int width, int heidgt, COLORREF color, HDC * dc);
+void changeColor (Painter * painter);
 
-void importImage (char * path, HDC * dc);
+void drawSubColorBar (int x, int y, int width, int height, COLORREF color, HDC dc);
 
-int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool);
-
-void selectionMenu (int wWidth, int wHeight, HDC * drawField, int x, int y, int x1, int y1);
+void drawColorBar (int x, int y, int width, int height, HDC dc);
 
 //-----------------------------------------------------------------------------
 
@@ -52,25 +60,14 @@ int main ()
 
 {
 
-    int wWidth = 800;
-    int wHeight = 800;
-
-    int toolbarHeight = 1;
-
-    int r = 10;
-
-    COLORREF color = TX_WHITE;
-
-    txCreateWindow (wWidth, wHeight);
+    txCreateWindow (WindWidth, WindHeight);
     txDisableAutoPause ();
-
-    MessageBox (txWindow (), "Help:\nm - main menu\nescape - exit\nright mouse button - set the color of the pixel that the cursor points to.", "Welcome", MB_ICONINFORMATION | MB_OK);
 
     while (true)
 
     {
 
-        int result = run (wWidth, wHeight, r, color);
+        int result = run (WindWidth, WindHeight);
 
         if (result == ResultExit)
 
@@ -80,85 +77,38 @@ int main ()
 
         }
 
-        else if (result == ResultRestart)
+        if (result == ResultRestart)
 
         {
-
-
-        }
-
-        else
-
-        {
-
-            char message[80] = "";
-
-            sprintf (message, "%s %d", "Unknown exit code: ", result);
-
-            MessageBox(txWindow (), message, "Error", MB_ICONWARNING | MB_OK);
 
         }
 
     }
 
+    return 0;
+
 }
 
 //-----------------------------------------------------------------------------
 
-int run (int wWidth, int wHeight, int r, COLORREF color)
+int run (int WindWidth, int WindHeight)
 
 {
 
-    HDC drawField = txCreateCompatibleDC (wWidth, wHeight);
-    HDC drawField_Old = txCreateCompatibleDC (wWidth, wHeight);
+    Painter painter = {drawDefault, useDefault, 10, TX_WHITE, txCreateCompatibleDC (WindWidth, WindHeight)};
 
-    txSetFillColor (RGB (50, 50, 50), drawField);
-    txClear (drawField);
-
-    //HDC default_image = txLoadImage ("Default.bmp");
-
-    //txBitBlt (drawField, 0, 0, 0, 0, default_image);
-
-    Tool tool = {ToolDefault, r, color, drawField, "text", "Arial"};
-
-    bool changeOldField = true;
+    txSetFillColor (RGB (45, 45, 45), painter.drawField);
+    txClear (painter.drawField);
 
     while (true)
 
     {
 
-        POINT mPos = txMousePos ();
-
-        txBitBlt (txDC (), 0, 0, 0, 0, drawField);
-
         if (txMouseButtons () == 1)
 
         {
 
-            if (changeOldField)
-
-            {
-
-                txBitBlt (drawField_Old, 0, 0, 0, 0, drawField, 0, 0);
-                changeOldField = false;
-
-            }
-
-            tool.use ();
-
-        }
-
-        else
-
-        {
-
-            if (!changeOldField)
-
-            {
-
-                changeOldField = true;
-
-            }
+            painter.use (painter.color, painter.r, painter.drawField);
 
         }
 
@@ -166,8 +116,7 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
         {
 
-            color = txGetPixel (mPos.x, mPos.y, drawField);
-            tool.color_ = color;
+            painter.color = txGetPixel (txMouseX (), txMouseY (), painter.drawField);
 
         }
 
@@ -175,8 +124,7 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
         {
 
-            txDeleteDC (drawField);
-            txDeleteDC (drawField_Old);
+            txDeleteDC (painter.drawField);
 
             return ResultExit;
 
@@ -186,10 +134,7 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
         {
 
-            txSleep (100);
-
-            txDeleteDC (drawField);
-            txDeleteDC (drawField_Old);
+            txDeleteDC (painter.drawField);
 
             return ResultRestart;
 
@@ -199,7 +144,9 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
         {
 
-            menu (wWidth, wHeight, &drawField, &color, &tool);
+            menu (&painter);
+
+            txSleep (100);
 
         }
 
@@ -207,7 +154,7 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
         {
 
-            tool.r_ ++;
+            painter.r ++;
 
         }
 
@@ -215,121 +162,149 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
         {
 
-            tool.r_ --;
+            painter.r--;
 
         }
 
-        if (GetAsyncKeyState ('Z') && GetAsyncKeyState (VK_CONTROL))
+        txBitBlt (txDC (), 0, 0, 0, 0, painter.drawField);
 
-        {
-
-            txSleep (100);
-            txBitBlt (drawField, 0, 0, 0, 0, drawField_Old, 0, 0);
-
-        }
-
-        if (GetAsyncKeyState ('S'))
-
-        {
-
-            while (true)
-
-            {
-
-                if (txMouseButtons () == 1)
-
-                {
-
-                    POINT firstPos = txMousePos ();
-
-                    int x = firstPos.x, y = firstPos.y, x1 = 0, y1 = 0;
-
-                    while (txMouseButtons () == 1)
-
-                    {
-
-                        txBitBlt (txDC (), 0, 0, 0, 0, drawField, 0, 0);
-
-                        mPos = txMousePos ();
-
-                        txSetColor (TX_WHITE, 3);
-                        txSetFillColor (TX_WHITE);
-
-                        txLine (firstPos.x, firstPos.y,     mPos.x, firstPos.y);
-                        txLine (firstPos.x, firstPos.y, firstPos.x,     mPos.y);
-                        txLine (firstPos.x,     mPos.y,     mPos.x,     mPos.y);
-                        txLine (    mPos.x, firstPos.y,     mPos.x,     mPos.y);
-
-                        txSleep (1);
-
-                    }
-
-                    POINT mPos = txMousePos ();
-
-                    x1 = mPos.x;
-                    y1 = mPos.y;
-
-                    selectionMenu (wWidth, wHeight, &drawField, x, y, x1, y1);
-
-                    break;
-
-                }
-
-                POINT mPos = txMousePos ();
-
-                txBitBlt (txDC (), 0, 0, 0, 0, drawField);
-
-                txSetColor (TX_WHITE, 3);
-                txSetFillColor (TX_WHITE);
-
-                txLine (mPos.x - 5, mPos.y, mPos.x + 5, mPos.y);
-                txLine (mPos.x, mPos.y - 5, mPos.x, mPos.y + 5);
-
-                txSleep (1);
-
-            }
-
-        }
-
-        tool.draw ();
+        painter.draw (painter.color, painter.r);
 
         txSleep (1);
 
     }
 
-    return 228;
-
 }
 
-//-----------------------------------------------------------------------------
-
-bool Save (HDC image)
+void menu (Painter * painter)
 
 {
 
-    const char * input = txInputBox ("Enter saving path:", "Save", "Image");
-
-    if (input)
+    MenuButton buttons[] =
 
     {
 
-        char path[PATH_MAX] = "";
+        {false, NULL, "Tools", false},
+        {false, NULL, "Color", false},
+        {true}
 
-        sprintf (path, "%s.bmp", input);
+    };
 
-        txSaveImage (path, image);
+    Menu m = {WindWidth / 2 - 50, WindHeight / 2 - 100, 100, 200, "Menu", "Arial", "Comic Sans MS", TX_WHITE, RGB (45, 45, 45), RGB (200, 200, 200), RGB (45, 45, 45), RGB (45, 45, 45), txDC (), buttons};
 
-        return true;
+    while (!GetAsyncKeyState (VK_ESCAPE))
+
+    {
+
+        m.draw ();
+
+        int result = m.check ();
+
+        if (result == 0)
+
+        {
+
+            txSleep (100);
+
+            chooseTool (painter);
+
+            return;
+
+        }
+
+        if (result == 1)
+
+        {
+
+            txSleep (100);
+
+            changeColor (painter);
+
+            return;
+
+        }
+
+        txSleep (1);
 
     }
 
-    return false;
+    txSleep (100);
 
 }
 
 //-----------------------------------------------------------------------------
 
-void drawColorBar (int x, int y, int width, int height, HDC * dc)
+void chooseTool (Painter * painter)
+
+{
+
+    MenuButton buttons[] = {
+
+        {false, NULL,   "Default", false},
+        {false, NULL,      "Line", false},
+        {false, NULL, "Rectanhle", false},
+        {true}
+
+    };
+
+    Menu m = {WindWidth / 2 - 50, WindHeight / 2 - 100, 100, 200, "Tools", "Arial", "Comic Sans MS", TX_WHITE, RGB (45, 45, 45), RGB (200, 200, 200), RGB (45, 45, 45), RGB (45, 45, 45), txDC (), buttons};
+
+    while (!GetAsyncKeyState (VK_ESCAPE))
+
+    {
+
+        m.draw ();
+
+        int result = m.check ();
+
+        switch (result)
+
+        {
+
+            case 0:
+
+            {
+
+                painter -> draw = drawDefault;
+                painter -> use = useDefault;
+                return;
+                break;
+
+            }
+
+            case 1:
+
+            {
+
+                painter -> draw = drawLine;
+                painter -> use = useLine;
+                return;
+                break;
+
+            }
+
+            case 2:
+
+            {
+
+                painter -> draw = drawRectangle;
+                painter -> use = useRectangle;
+                return;
+                break;
+
+            }
+
+        }
+
+        txSleep (1);
+
+    }
+
+}
+
+//-----------------------------------------------------------------------------
+
+void drawColorBar (int x, int y, int width, int height, HDC dc)
 
 {
 
@@ -347,10 +322,10 @@ void drawColorBar (int x, int y, int width, int height, HDC * dc)
 
         COLORREF color = RGB (r, g, b);
 
-        txSetColor (color, 1, * dc);
-        txSetFillColor (color, * dc);
+        txSetColor (color, 1, dc);
+        txSetFillColor (color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         lineX += interval;
 
@@ -364,10 +339,10 @@ void drawColorBar (int x, int y, int width, int height, HDC * dc)
 
         COLORREF color = RGB (r, g, b);
 
-        txSetColor (color, 1, * dc);
-        txSetFillColor (color, * dc);
+        txSetColor (color, 1, dc);
+        txSetFillColor (color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         lineX += interval;
 
@@ -381,10 +356,10 @@ void drawColorBar (int x, int y, int width, int height, HDC * dc)
 
         COLORREF color = RGB (r, g, b);
 
-        txSetColor (color, 1, * dc);
-        txSetFillColor (color, * dc);
+        txSetColor (color, 1, dc);
+        txSetFillColor (color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         b++;
 
@@ -398,10 +373,10 @@ void drawColorBar (int x, int y, int width, int height, HDC * dc)
 
         COLORREF color = RGB (r, g, b);
 
-        txSetColor (color, 1, * dc);
-        txSetFillColor (color, * dc);
+        txSetColor (color, 1, dc);
+        txSetFillColor (color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         g--;
 
@@ -415,10 +390,10 @@ void drawColorBar (int x, int y, int width, int height, HDC * dc)
 
         COLORREF color = RGB (r, g, b);
 
-        txSetColor (color, 1, * dc);
-        txSetFillColor (color, * dc);
+        txSetColor (color, 1, dc);
+        txSetFillColor (color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         r++;
 
@@ -432,10 +407,10 @@ void drawColorBar (int x, int y, int width, int height, HDC * dc)
 
         COLORREF color = RGB (r, g, b);
 
-        txSetColor (color, 1, * dc);
-        txSetFillColor (color, * dc);
+        txSetColor (color, 1, dc);
+        txSetFillColor (color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         b--;
 
@@ -447,7 +422,7 @@ void drawColorBar (int x, int y, int width, int height, HDC * dc)
 
 //-----------------------------------------------------------------------------
 
-void drawSubColorBar (int x, int y, int width, int height, COLORREF color, HDC * dc)
+void drawSubColorBar (int x, int y, int width, int height, COLORREF color, HDC dc)
 
 {
 
@@ -463,10 +438,10 @@ void drawSubColorBar (int x, int y, int width, int height, COLORREF color, HDC *
 
         COLORREF l_color = RGB (r / 255 * i, g / 255 * i, b / 255 * i);
 
-        txSetColor (l_color, 1, * dc);
-        txSetFillColor (l_color, * dc);
+        txSetColor (l_color, 1, dc);
+        txSetFillColor (l_color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         lineX += interval;
 
@@ -478,10 +453,10 @@ void drawSubColorBar (int x, int y, int width, int height, COLORREF color, HDC *
 
         COLORREF l_color = RGB (r + (255 - r) / 255 * i, g + (255 - g) / 255 * i, b + (255 - b) / 255 * i);
 
-        txSetColor (l_color, 1, * dc);
-        txSetFillColor (l_color, * dc);
+        txSetColor (l_color, 1, dc);
+        txSetFillColor (l_color, dc);
 
-        txRectangle (x + lineX, y, x + lineX + interval, y + height, * dc);
+        txRectangle (x + lineX, y, x + lineX + interval, y + height, dc);
 
         lineX += interval;
 
@@ -491,24 +466,29 @@ void drawSubColorBar (int x, int y, int width, int height, COLORREF color, HDC *
 
 //-----------------------------------------------------------------------------
 
-void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, Tool * tool)
+void changeColor (Painter * painter)
 
 {
 
     int colorBarWidth = 300, colorBarHeight = 20;
 
-    COLORREF currentcolor = *color;
-    COLORREF subcolor = *color;
+    COLORREF currentcolor = painter -> color;
+    COLORREF subcolor = painter -> color;
 
-    HDC dc = txCreateCompatibleDC (wWidth, wHeight);
+    HDC dc = txCreateCompatibleDC (WindWidth, WindHeight);
 
-    Button b1 = {wWidth / 2 + colorBarWidth / 2 -  40, wHeight / 2 + colorBarHeight / 2 + 20, 40, 20,     "Ok", "Arial", 20, dc, RGB (32, 32, 32), TX_WHITE, TX_WHITE, false, 2};
-    Button b2 = {wWidth / 2 + colorBarWidth / 2 - 140, wHeight / 2 + colorBarHeight / 2 + 20, 80, 20, "Cancel", "Arial", 20, dc, RGB (32, 32, 32), TX_WHITE, TX_WHITE, false, 2};
+    Button buttons[] =
 
-    Button buttons[3] = {b1, b2, EndButton};
+    {
 
-    drawColorBar (wWidth / 2 - colorBarWidth / 2, wHeight / 2 - colorBarHeight / 2, 300, 20, &dc);
-    drawSubColorBar (wWidth / 2 - colorBarWidth / 2, wHeight / 2 - colorBarHeight / 2 - 40, 300, 20, currentcolor, &dc);
+        {WindWidth / 2 + colorBarWidth / 2 -  40, WindHeight / 2 + colorBarHeight / 2 + 20, 40, 20,     "Ok", "Arial", 20, dc, RGB (32, 32, 32), TX_WHITE, TX_WHITE, false, 2},
+        {WindWidth / 2 + colorBarWidth / 2 - 140, WindHeight / 2 + colorBarHeight / 2 + 20, 80, 20, "Cancel", "Arial", 20, dc, RGB (32, 32, 32), TX_WHITE, TX_WHITE, false, 2},
+        EndButton
+
+    };
+
+    drawColorBar (WindWidth / 2 - colorBarWidth / 2, WindHeight / 2 - colorBarHeight / 2, 300, 20, dc);
+    drawSubColorBar (WindWidth / 2 - colorBarWidth / 2, WindHeight / 2 - colorBarHeight / 2 - 40, 300, 20, currentcolor, dc);
 
     while (true)
 
@@ -516,7 +496,7 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
 
         POINT mPos = txMousePos ();
 
-        if (mPos.x > wWidth / 2 - colorBarWidth / 2 && mPos.x < wWidth / 2 + colorBarWidth / 2 && mPos.y > wHeight / 2 - colorBarHeight / 2 - 40 && mPos.y < wHeight / 2 + colorBarHeight / 2)
+        if (mPos.x > WindWidth / 2 - colorBarWidth / 2 && mPos.x < WindWidth / 2 + colorBarWidth / 2 && mPos.y > WindHeight / 2 - colorBarHeight / 2 - 40 && mPos.y < WindHeight / 2 + colorBarHeight / 2)
 
         {
 
@@ -526,13 +506,13 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
 
                 currentcolor = txGetPixel (mPos.x, mPos.y);
 
-                drawSubColorBar (wWidth / 2 - colorBarWidth / 2, wHeight / 2 - colorBarHeight / 2 - 40, 300, 20, subcolor, &dc);
+                drawSubColorBar (WindWidth / 2 - colorBarWidth / 2, WindHeight / 2 - colorBarHeight / 2 - 40, 300, 20, subcolor, dc);
 
             }
 
         }
 
-        if (mPos.x > wWidth / 2 - colorBarWidth / 2 && mPos.x < wWidth / 2 + colorBarWidth / 2 && mPos.y > wHeight / 2 - colorBarHeight / 2 && mPos.y < wHeight / 2 + colorBarHeight / 2)
+        if (mPos.x > WindWidth / 2 - colorBarWidth / 2 && mPos.x < WindWidth / 2 + colorBarWidth / 2 && mPos.y > WindHeight / 2 - colorBarHeight / 2 && mPos.y < WindHeight / 2 + colorBarHeight / 2)
 
         {
 
@@ -542,7 +522,7 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
 
                 subcolor = txGetPixel (mPos.x, mPos.y);
 
-                drawColorBar (wWidth / 2 - colorBarWidth / 2, wHeight / 2 - colorBarHeight / 2, 300, 20, &dc);
+                drawColorBar (WindWidth / 2 - colorBarWidth / 2, WindHeight / 2 - colorBarHeight / 2, 300, 20, dc);
 
             }
 
@@ -560,8 +540,7 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
 
                 txSleep (100);
 
-                * color = currentcolor;
-                tool -> color_ = *color;
+                painter -> color = currentcolor;
 
                 txDeleteDC (dc);
 
@@ -605,8 +584,7 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
 
             txSleep (100);
 
-            * color = currentcolor;
-            tool -> color_ = *color;
+            painter -> color = currentcolor;
 
             txDeleteDC (dc);
 
@@ -617,9 +595,9 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
         txSetFillColor (currentcolor, dc);
         txSetColor (currentcolor, 1, dc);
 
-        txRectangle (wWidth / 2 - colorBarWidth / 2, wHeight / 2 + colorBarHeight / 2 + 20, wWidth / 2 - colorBarWidth / 2 + 20, wHeight / 2 + colorBarHeight / 2 + 40, dc);
+        txRectangle (WindWidth / 2 - colorBarWidth / 2, WindHeight / 2 + colorBarHeight / 2 + 20, WindWidth / 2 - colorBarWidth / 2 + 20, WindHeight / 2 + colorBarHeight / 2 + 40, dc);
 
-        txBitBlt (txDC (), 0, 0, 0, 0, *drawField, 0, 0);
+        txBitBlt (txDC (), 0, 0, 0, 0, painter -> drawField, 0, 0);
         txTransparentBlt (txDC(), 0, 0, 0, 0, dc, 0, 0);
 
         txSleep (1);
@@ -627,442 +605,5 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
     }
 
     txDeleteDC (dc);
-
-}
-
-//-----------------------------------------------------------------------------
-
-void menu (int wWidth, int wHeight, HDC * drawField, COLORREF * color, Tool * tool)
-{
-
-
-    HDC buttonsField = txCreateCompatibleDC (wWidth, wHeight);
-
-    Button b1 = {wWidth / 2 - 50, wHeight / 2 - 100, 100, 40,   "Save", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-    Button b2 = {wWidth / 2 - 50, wHeight / 2 -  60, 100, 40,   "Load", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-    Button b3 = {wWidth / 2 - 50, wHeight / 2 -  20, 100, 40,  "Color", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-    Button b4 = {wWidth / 2 - 50, wHeight / 2 +  20, 100, 40, "Import", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-    Button b5 = {wWidth / 2 - 50, wHeight / 2 +  60, 100, 40,  "Tools", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-
-    Button buttons[6] = {b1, b2, b3, b4, b5, EndButton};
-
-    while (true)
-
-    {
-
-        int result = manageButtons (buttons);
-
-        switch (result)
-
-        {
-
-            case 0:
-
-            {
-
-                if (Save (* drawField)) return;
-
-                break;
-
-            }
-
-            case 1:
-
-            {
-
-                const char * input = txInputBox ("Enter load path:", "Load", "Image");
-
-                if (input)
-
-                {
-
-                    char path[PATH_MAX] = "";
-
-                    sprintf (path, "%s.bmp", input);
-
-                    HDC image = txLoadImage (path);
-
-                    txBitBlt (* drawField, 0, 0, 0, 0, image, 0, 0);
-
-                    return;
-
-                }
-
-                break;
-
-            }
-
-            case 2:
-
-            {
-
-                txSleep (100);
-
-                changeColor (wWidth, wHeight, color, drawField, tool);
-
-                return;
-
-                break;
-
-            }
-
-            case 3:
-
-            {
-
-                const char * input = txInputBox ("Enter load path (bmp):", "Load", "Image");
-
-                if (input)
-
-                {
-
-                    char path[PATH_MAX] = "";
-
-                    sprintf (path, "%s.bmp", input);
-
-                    importImage (path, drawField);
-
-                }
-
-                return;
-
-                break;
-
-            }
-
-            case 4:
-
-            {
-
-                txSleep (100);
-
-                int result = toolsMenu (wWidth, wHeight, drawField, tool);
-
-                if (result != ResultExit)
-
-                {
-
-                    txSleep (100);
-
-                    return;
-
-                }
-
-                break;
-
-            }
-
-        }
-
-        if (GetAsyncKeyState (VK_ESCAPE))
-
-        {
-
-            txSleep (100);
-
-            txDeleteDC (buttonsField);
-
-            return;
-
-        }
-
-
-        txBitBlt (txDC (), 0, 0, 0, 0, * drawField, 0, 0);
-        txTransparentBlt (txDC() , 0, 0, 0, 0, buttonsField, 0, 0);
-
-        txSleep (1);
-
-    }
-
-}
-
-//-----------------------------------------------------------------------------
-
-void importImage (char * path, HDC * dc)
-
-{
-
-    MessageBox (txWindow (), "a - set alpha color for the imported image\nescape - cancel", "Import: ", MB_ICONINFORMATION | MB_OK);
-
-    HDC image = txLoadImage (path);
-
-    COLORREF Alpha = NULL;
-
-    while (true)
-
-    {
-
-        POINT mPos = txMousePos ();
-
-        txBitBlt (txDC (), 0, 0, 0, 0, *dc, 0, 0);
-        txTransparentBlt (txDC (), mPos.x, mPos.y, 0, 0, image, 0, 0, Alpha);
-
-        if (txMouseButtons () == 1)
-
-        {
-
-            txTransparentBlt (* dc, mPos.x, mPos.y, 0, 0, image, 0, 0, Alpha);
-
-            txDeleteDC (image);
-
-            txSleep (100);
-
-            return;
-
-        }
-
-        if (GetAsyncKeyState (VK_ESCAPE) || txMouseButtons () == 2)
-
-        {
-
-            txSleep (100);
-
-            txDeleteDC (image);
-
-            return;
-
-        }
-
-        if (GetAsyncKeyState ('A'))
-
-        {
-
-            while (true)
-
-            {
-
-                POINT mPos1 = txMousePos ();
-
-                if (txMouseButtons () == 1)
-
-                {
-
-                    if (mPos1.x >= mPos.x && mPos1.x < mPos.x + txGetExtentX (image) && mPos1.y >= mPos.y && mPos1.y < mPos.y + txGetExtentY (image))
-
-                    {
-
-                        Alpha = txGetPixel (mPos1.x, mPos1.y);
-
-                        txSleep (100);
-
-                        break;
-
-                    }
-
-                }
-
-                if (GetAsyncKeyState (VK_ESCAPE) || txMouseButtons () == 2)
-
-                {
-
-                    txSleep (100);
-
-                    break;
-
-                }
-
-                txSleep (1);
-
-            }
-
-        }
-
-        txSleep (1);
-
-    }
-
-}
-
-//-----------------------------------------------------------------------------
-
-int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool)
-
-{
-
-    HDC buttonsField = txCreateCompatibleDC (wWidth, wHeight);
-
-    Button b1 = {wWidth / 2 - 50, wHeight / 2 - 60, 100, 40,   "Default", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-    Button b2 = {wWidth / 2 - 50, wHeight / 2 - 20, 100, 40,      "Line", "Comic Sans MS", 35, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-    Button b3 = {wWidth / 2 - 50, wHeight / 2 + 20, 100, 40, "Rectangle", "Comic Sans MS", 28, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-
-    Button buttons[4] = {b1, b2, b3, EndButton};
-
-    while (true)
-
-    {
-
-        txBitBlt (txDC (), 0, 0, 0, 0, *drawField);
-        txTransparentBlt (txDC (), 0, 0, 0, 0, buttonsField, 0, 0);
-
-        int result = manageButtons (buttons);
-
-        switch (result)
-
-        {
-
-            case 0:
-
-            {
-
-                tool -> type_ = ToolDefault;
-
-                txDeleteDC (buttonsField);
-
-                return -1;
-
-                break;
-
-            }
-
-            case 1:
-
-            {
-
-                tool -> type_ = ToolLine;
-
-                txDeleteDC (buttonsField);
-
-                return -1;
-
-                break;
-
-            }
-
-            case 2:
-
-            {
-
-                tool -> type_ = ToolRectangle;
-
-                txDeleteDC (buttonsField);
-
-                return -1;
-
-                break;
-
-            }
-
-            default:
-
-            {
-
-                if (GetAsyncKeyState (VK_ESCAPE))
-
-                {
-
-                    txSleep (100);
-
-                    return ResultExit;
-
-                }
-
-            }
-
-        }
-
-        txSleep (1);
-
-    }
-
-}
-
-void selectionMenu (int wWidth, int wHeight, HDC * drawField, int x, int y, int x1, int y1)
-
-{
-
-    HDC buttonsField = txCreateCompatibleDC (wWidth, wHeight);
-
-    Button b1 = {wWidth / 2 - 50, wHeight / 2, 100, 40, "Copy", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
-
-    Button buttons[2] = {b1, EndButton};
-
-    while (true)
-
-    {
-
-        int result = manageButtons (buttons);
-
-        switch (result)
-
-        {
-
-            case 0:
-
-            {
-
-                $(x);
-                $(y);
-                $(y1);
-                $(x1);
-                $(x1 - x);
-                $(y1 - y);
-
-                txSleep (100);
-
-                HDC image = txCreateCompatibleDC (x1 - x, y1 - y);
-                txBitBlt (image, x, y, x1 - x, y1 - y, * drawField);
-
-                while (true)
-
-                {
-
-                    POINT mPos = txMousePos ();
-
-                    txBitBlt (txDC (), 0, 0, 0, 0, * drawField, 0, 0);
-                    txTransparentBlt (txDC (), mPos.x, mPos.y, 0, 0, image);
-
-                    if (txMouseButtons () == 1)
-
-                    {
-
-                        txTransparentBlt (* drawField, mPos.x, mPos.y, 0, 0, image);
-
-                        txSleep (100);
-
-                        return;
-
-                    }
-
-                    if (GetAsyncKeyState (VK_ESCAPE))
-
-                    {
-
-                        txSleep (100);
-                        return;
-
-                    }
-
-                    txSleep (1);
-
-                }
-
-                return;
-
-                break;
-
-            }
-
-            default:
-
-            {
-
-                if (GetAsyncKeyState (VK_ESCAPE))
-
-                {
-
-                    txSleep (100);
-                    return;
-
-                }
-
-            }
-
-        }
-
-        txTransparentBlt (txDC (), 0, 0, 0, 0, buttonsField, 0, 0);
-
-        txSleep (1);
-
-    }
 
 }
