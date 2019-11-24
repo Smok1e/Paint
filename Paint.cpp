@@ -1,5 +1,5 @@
 #include <TXLib.h>
-#include "C:\Users\Фёдор\Documents\GitHub\Buttons\Buttons.h"
+#include "Buttons.h"
 #include "Tools.h"
 
 //-----------------------------------------------------------------------------
@@ -10,6 +10,19 @@ enum Result
 
     ResultExit,
     ResultRestart
+
+};
+
+//-----------------------------------------------------------------------------
+
+struct rectangle
+
+{
+
+    int x;
+    int y;
+    int x1;
+    int y1;
 
 };
 
@@ -30,6 +43,8 @@ void drawSubColorBar (int x, int y, int width, int heidgt, COLORREF color, HDC *
 void importImage (char * path, HDC * dc);
 
 int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool);
+
+void selectionMenu (int wWidth, int wHeight, HDC * drawField, int x, int y, int x1, int y1);
 
 //-----------------------------------------------------------------------------
 
@@ -94,10 +109,17 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
 {
 
-    HDC drawField = txLoadImage ("Default.bmp");
-    HDC drawField_Old = txCreateCompatibleDC (800, 800);
+    HDC drawField = txCreateCompatibleDC (wWidth, wHeight);
+    HDC drawField_Old = txCreateCompatibleDC (wWidth, wHeight);
 
-    Tool tool = {ToolDefault, r, color, drawField};
+    txSetFillColor (RGB (50, 50, 50), drawField);
+    txClear (drawField);
+
+    //HDC default_image = txLoadImage ("Default.bmp");
+
+    //txBitBlt (drawField, 0, 0, 0, 0, default_image);
+
+    Tool tool = {ToolDefault, r, color, drawField, "text", "Arial"};
 
     bool changeOldField = true;
 
@@ -203,6 +225,69 @@ int run (int wWidth, int wHeight, int r, COLORREF color)
 
             txSleep (100);
             txBitBlt (drawField, 0, 0, 0, 0, drawField_Old, 0, 0);
+
+        }
+
+        if (GetAsyncKeyState ('S'))
+
+        {
+
+            while (true)
+
+            {
+
+                if (txMouseButtons () == 1)
+
+                {
+
+                    POINT firstPos = txMousePos ();
+
+                    int x = firstPos.x, y = firstPos.y, x1 = 0, y1 = 0;
+
+                    while (txMouseButtons () == 1)
+
+                    {
+
+                        txBitBlt (txDC (), 0, 0, 0, 0, drawField, 0, 0);
+
+                        mPos = txMousePos ();
+
+                        txSetColor (TX_WHITE, 3);
+                        txSetFillColor (TX_WHITE);
+
+                        txLine (firstPos.x, firstPos.y,     mPos.x, firstPos.y);
+                        txLine (firstPos.x, firstPos.y, firstPos.x,     mPos.y);
+                        txLine (firstPos.x,     mPos.y,     mPos.x,     mPos.y);
+                        txLine (    mPos.x, firstPos.y,     mPos.x,     mPos.y);
+
+                        txSleep (1);
+
+                    }
+
+                    POINT mPos = txMousePos ();
+
+                    x1 = mPos.x;
+                    y1 = mPos.y;
+
+                    selectionMenu (wWidth, wHeight, &drawField, x, y, x1, y1);
+
+                    break;
+
+                }
+
+                POINT mPos = txMousePos ();
+
+                txBitBlt (txDC (), 0, 0, 0, 0, drawField);
+
+                txSetColor (TX_WHITE, 3);
+                txSetFillColor (TX_WHITE);
+
+                txLine (mPos.x - 5, mPos.y, mPos.x + 5, mPos.y);
+                txLine (mPos.x, mPos.y - 5, mPos.x, mPos.y + 5);
+
+                txSleep (1);
+
+            }
 
         }
 
@@ -420,7 +505,7 @@ void changeColor (int wWidth, int wHeight, COLORREF * color, HDC * drawField, To
     Button b1 = {wWidth / 2 + colorBarWidth / 2 -  40, wHeight / 2 + colorBarHeight / 2 + 20, 40, 20,     "Ok", "Arial", 20, dc, RGB (32, 32, 32), TX_WHITE, TX_WHITE, false, 2};
     Button b2 = {wWidth / 2 + colorBarWidth / 2 - 140, wHeight / 2 + colorBarHeight / 2 + 20, 80, 20, "Cancel", "Arial", 20, dc, RGB (32, 32, 32), TX_WHITE, TX_WHITE, false, 2};
 
-    Button * buttons[3] = {&b1, &b2, &EndButton};
+    Button buttons[3] = {b1, b2, EndButton};
 
     drawColorBar (wWidth / 2 - colorBarWidth / 2, wHeight / 2 - colorBarHeight / 2, 300, 20, &dc);
     drawSubColorBar (wWidth / 2 - colorBarWidth / 2, wHeight / 2 - colorBarHeight / 2 - 40, 300, 20, currentcolor, &dc);
@@ -559,7 +644,7 @@ void menu (int wWidth, int wHeight, HDC * drawField, COLORREF * color, Tool * to
     Button b4 = {wWidth / 2 - 50, wHeight / 2 +  20, 100, 40, "Import", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
     Button b5 = {wWidth / 2 - 50, wHeight / 2 +  60, 100, 40,  "Tools", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
 
-    Button * buttons[6] = {&b1, &b2, &b3, &b4, &b5, &EndButton};
+    Button buttons[6] = {b1, b2, b3, b4, b5, EndButton};
 
     while (true)
 
@@ -595,7 +680,9 @@ void menu (int wWidth, int wHeight, HDC * drawField, COLORREF * color, Tool * to
 
                     sprintf (path, "%s.bmp", input);
 
-                    * drawField = txLoadImage (path);
+                    HDC image = txLoadImage (path);
+
+                    txBitBlt (* drawField, 0, 0, 0, 0, image, 0, 0);
 
                     return;
 
@@ -798,7 +885,7 @@ int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool)
     Button b2 = {wWidth / 2 - 50, wHeight / 2 - 20, 100, 40,      "Line", "Comic Sans MS", 35, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
     Button b3 = {wWidth / 2 - 50, wHeight / 2 + 20, 100, 40, "Rectangle", "Comic Sans MS", 28, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
 
-    Button * buttons[4] = {&b1, &b2, &b3, &EndButton};
+    Button buttons[4] = {b1, b2, b3, EndButton};
 
     while (true)
 
@@ -872,6 +959,107 @@ int toolsMenu (int wWidth, int wHeight, HDC * drawField, Tool * tool)
             }
 
         }
+
+        txSleep (1);
+
+    }
+
+}
+
+void selectionMenu (int wWidth, int wHeight, HDC * drawField, int x, int y, int x1, int y1)
+
+{
+
+    HDC buttonsField = txCreateCompatibleDC (wWidth, wHeight);
+
+    Button b1 = {wWidth / 2 - 50, wHeight / 2, 100, 40, "Copy", "Comic Sans MS", 32, buttonsField, RGB (32, 32, 32), TX_WHITE, TX_LIGHTCYAN, false, 3};
+
+    Button buttons[2] = {b1, EndButton};
+
+    while (true)
+
+    {
+
+        int result = manageButtons (buttons);
+
+        switch (result)
+
+        {
+
+            case 0:
+
+            {
+
+                $(x);
+                $(y);
+                $(y1);
+                $(x1);
+                $(x1 - x);
+                $(y1 - y);
+
+                txSleep (100);
+
+                HDC image = txCreateCompatibleDC (x1 - x, y1 - y);
+                txBitBlt (image, x, y, x1 - x, y1 - y, * drawField);
+
+                while (true)
+
+                {
+
+                    POINT mPos = txMousePos ();
+
+                    txBitBlt (txDC (), 0, 0, 0, 0, * drawField, 0, 0);
+                    txTransparentBlt (txDC (), mPos.x, mPos.y, 0, 0, image);
+
+                    if (txMouseButtons () == 1)
+
+                    {
+
+                        txTransparentBlt (* drawField, mPos.x, mPos.y, 0, 0, image);
+
+                        txSleep (100);
+
+                        return;
+
+                    }
+
+                    if (GetAsyncKeyState (VK_ESCAPE))
+
+                    {
+
+                        txSleep (100);
+                        return;
+
+                    }
+
+                    txSleep (1);
+
+                }
+
+                return;
+
+                break;
+
+            }
+
+            default:
+
+            {
+
+                if (GetAsyncKeyState (VK_ESCAPE))
+
+                {
+
+                    txSleep (100);
+                    return;
+
+                }
+
+            }
+
+        }
+
+        txTransparentBlt (txDC (), 0, 0, 0, 0, buttonsField, 0, 0);
 
         txSleep (1);
 

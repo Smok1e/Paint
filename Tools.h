@@ -1,5 +1,7 @@
 #include <TXLib.h>
 
+//-----------------------------------------------------------------------------
+
 enum Tools
 
 {
@@ -21,7 +23,10 @@ struct Tool
     COLORREF color_;
     HDC dc_;
 
-    void draw () const;
+    char * text_;
+    char * font_;
+
+    void draw ();
     void use ();
 
 };
@@ -42,7 +47,7 @@ void useRectangle (COLORREF color, HDC dc);
 
 //-----------------------------------------------------------------------------
 
-void Tool::draw () const
+void Tool::draw ()
 
 {
 
@@ -279,4 +284,3 @@ void useRectangle (COLORREF color, HDC dc)
     txRectangle (firstPos.x, firstPos.y, mPos.x, mPos.y, dc);
 
 }
-
